@@ -1,15 +1,18 @@
 # Ascend.AI
 
-[One‑line description of what your project does]
+An AI-powered trip planner that enhances travel routes by suggesting nearby points of interest based on user preferences.
 
-**Team:** Sopo Mrelashvili, Toma Danelia, Davit Ioramashvili  
-**Course:** Building AI‑Powered Applications  
+**Team:** Sopo Mrelashvili, Toma Danelia, Davit Ioramashvili, Temuri Matchavariani  
+**Course:** Building AI-Powered Applications  
 **Institution:** KIU  
 **Semester:** Fall 2025
 
 ## About
 
-[2–3 sentence description of your project]
+Ascend.AI helps travelers make the most of their journeys by intelligently expanding their planned routes.  
+Users can input a trip (e.g., from Berlin to Paris) and specify how far off-route they’re willing to explore.  
+The system then recommends interesting nearby attractions — like landmarks,historical sites, art galleries, or restaurants — using AI to personalize suggestions based on user interests.  
+The web app is built with React and FastAPI, using Supabase for authentication and data management.
 
 ## Status
 
@@ -29,11 +32,11 @@
 
 ## Tech Stack
 
-- **Frontend:** [Framework]
-- **Backend:** [Framework]
-- **AI/ML:** [Model(s)]
-- **Database:** [Database]
-- **Hosting:** [Platform]
+- **Frontend:** React (Vite + TypeScript)
+- **Backend:** FastAPI (Python)
+- **AI/ML:** Route and recommendation models (e.g., place ranking using OpenAI API or local embeddings and google maps API)
+- **Database:** Supabase (PostgreSQL + Auth)
+- **Hosting:** EC2 AWS machine/ Vercel (Frontend) / Render or Supabase Edge Functions (Backend)
 
 ## Getting Started
 
