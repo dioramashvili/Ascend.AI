@@ -14,7 +14,7 @@
 | Sopo Mrelashvili | mrelashvili.sopo@kiu.edu.ge | @sopomrela | Team Lead |
 | Toma Danelia | danelia.toma@kiu.edu.ge | @tomadanelia | Backend Engineer |
 | Davit Ioramashvili | ioramashvili.davit@kiu.edu.ge | @dioramashvili | Tech Lead |
-| Temuri Machavariani | machavariani.temuri@kiu.edu.ge | @username | Role |
+| Temuri Machavariani | machavariani.temuri@kiu.edu.ge | Lemo791 | Frontend Developer |
 
 ---
 
@@ -313,7 +313,7 @@ If signing digitally, each team member should:
 3. Commit this file with a commit message: "Sign team contract - [Your Name]"
 
 - **Sopo Mrelashvili** agreed on 14/10/2025
-- **[Name]** agreed on [Date]
+- **Davit Ioramashvili** agreed on 22/10/2025
 - **[Name]** agreed on [Date]
 - **[Name]** agreed on [Date]
 
