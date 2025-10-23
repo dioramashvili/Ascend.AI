@@ -314,7 +314,7 @@ If signing digitally, each team member should:
 
 - **Sopo Mrelashvili** agreed on 14/10/2025
 - **Davit Ioramashvili** agreed on 22/10/2025
-- **[Name]** agreed on [Date]
+- **Toma Danelia** agreed on 20/23/2025
 - **[Name]** agreed on [Date]
 
 
