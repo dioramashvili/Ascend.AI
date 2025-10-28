@@ -9,95 +9,64 @@
 
 ## 1. Problem Statement
 
-### The Problem
+Choosing a career path is one of the most impactful life decisions, yet most people make it without experiencing what the job is actually like. Students and early-career professionals often rely on stereotypes, online articles, or hearsay instead of real-world exposure. As a result, many waste years pursuing unsuitable fields.
 
-Choosing a career path is one of the most impactful decisions in life — yet most people make it without experiencing what the job actually feels like. Students and early-career individuals often rely on limited information, assumptions, or external advice. As a result, they invest years studying or working in fields that don’t align with their interests, skills, or expectations.
-
-Currently, the only way to “test” a career is through internships or shadowing programs, which are difficult to access, short-term, and not scalable. There’s no immersive, low-cost way to simulate a real-world professional environment before committing to it.
-
-An AI-powered system can bridge this gap by **simulating authentic workplace experiences** through dynamic, scenario-based interactions and performance assessments — helping users explore, experience, and evaluate careers before pursuing them.
+Traditional options (internships, shadowing) are limited, costly, and hard to access.  
+**CareerSim** solves this by using AI to simulate realistic workplace scenarios, letting users “test-drive” careers through interactive decision-making experiences and AI-driven performance assessments.
 
 ---
 
 ### Scope
 
-**What's In Scope:**
-- AI-generated real-world career scenarios (via Gemini API)  
-- User interaction with simulations and decision-making tasks  
-- AI-based feedback and assessment of user responses  
-- Basic user registration and progress tracking  
+**In Scope**
+- AI-generated text scenarios simulating professional tasks  
+- User decision-making and reflective feedback loop  
+- AI assessment of responses (qualitative + numeric scoring)  
+- Secure user accounts and progress tracking  
 
-**What's Out of Scope (Future Work):**
-- Integration with educational or recruitment systems  
-- Long-term behavioral analytics
-
-**Why This Scope Makes Sense:**  
-It’s feasible within a semester and demonstrates strong AI integration through text generation, evaluation, and interaction loops.
+**Out of Scope (Future Work)**
+- VR or multimedia simulation  
+- Integration with recruiters or institutions  
+- Long-term skill-tracking analytics  
 
 ---
 
 ## 2. Target Users
 
-### Primary User Persona
+**Primary Users:**  
+High-school students, university students, and early-career switchers.
 
-**User Type:** Students, job seekers, and early-career professionals  
+**User Needs**
+1. Realistic, low-barrier exposure to multiple careers.  
+2. Actionable feedback about fit and performance.  
+3. Safe experimentation environment with AI guidance.  
 
-**Demographics:**
-- Age range: 16–30  
-- Technical proficiency: Basic (comfortable using web platforms)  
-- Context of use: Desktop or mobile browser  
-
-**User Needs:**
-1. **Career Exploration:** Understand what daily work in a specific field is like.  
-2. **Skill Assessment:** Receive feedback on their choices and reasoning.  
-3. **Guidance:** Discover career paths that align with personal strengths.  
-
-**User Pain Points:**
-- Limited exposure to real job challenges.  
-- Career decisions often made based on stereotypes or advice.  
-- Lack of personalized feedback on suitability for different roles.
+**Pain Points**
+- Lack of accessible “try-before-you-commit” career experiences.  
+- Overwhelm from information and contradictory advice.  
+- No objective feedback mechanism about skill-role alignment.
 
 ---
 
 ## 3. Success Criteria
 
-### Product Success Metrics
-
-1. **Relevance:** 80% of users agree that scenarios feel realistic.  
-2. **Engagement:** 70% of users complete at least one full simulation.  
-3. **Accuracy:** AI assessment aligns with expert human feedback ≥75%.  
-4. **Satisfaction:** Average user rating ≥4/5 in feedback survey.  
-5. **Performance:** Response time under 5 seconds per prompt.  
-
-### Technical Success Criteria
-
-- Average API latency: <3 seconds  
-- Backend uptime: ≥95% during testing  
-- Scenario generation cost: <$0.15 per session  
-- Error rate: <5%  
+### Product Success
+- ≥80 % users rate simulations as “realistic” or “very realistic”.  
+- ≥70 % complete at least one full simulation session.  
+- ≥75 % alignment between AI and expert human evaluation.  
+- Average latency < 5 s per AI call.  
 
 ### Learning Goals
-
-- **Sopo:** Team coordination, user testing, and documentation.  
-- **Toma:** Backend architecture, database management.  
-- **Davit:** AI integration with Gemini API, prompt design, and scoring logic.  
-- **Temuri:** Frontend UI/UX design and scenario interaction flow.
+- **Sopo:** Coordination, research documentation.  
+- **Toma:** Backend and database design.  
+- **Davit:** Gemini API integration and prompt design.  
+- **Temuri:** Frontend UX and scenario visualization.
 
 ---
 
 ## 4. Technical Architecture
 
-### System Overview
-
-Users select a career (e.g., Software Engineer, Nurse, Project Manager).  
-The frontend collects their input and sends it to the backend, which uses the **Gemini API** to generate realistic workplace scenarios and decisions the user must make.  
-Once the user interacts with the simulation, Gemini analyzes their choices and provides qualitative and quantitative assessments.
-
-Results are stored in a **PostgreSQL database**, allowing users to view their career readiness and track progress across multiple simulations.
-
----
-
-### Architecture Diagram
+Users choose a career track → system generates a simulation → user interacts and responds → Gemini evaluates and scores → data stored in PostgreSQL.
 
 
 ```
@@ -116,108 +85,158 @@ Results are stored in a **PostgreSQL database**, allowing users to view their ca
 
 
 
----
 
-### Technology Stack
-
-**Frontend:**
-- React + TailwindCSS  
-- Deployed via Vercel  
-
-**Backend:**
-- FastAPI (Python)  
-- Hosted on Render or Railway  
-
-**AI/ML Services:**
-- Gemini API for dynamic scenario generation and response evaluation  
-
-**Database:**
-- PostgreSQL (Render or Neon hosting)  
-
-**Tooling & DevOps:**
-- GitHub for version control  
-- GitHub Projects for task management  
+> **Note:** “Map API (Routes)” here refers to a learning-path mapping utility (not geographic maps). It visualizes a user’s simulation journey across multiple career options.
 
 ---
 
-## 5. Risk Assessment
+## 5. Responsible AI Strategy
 
-### Technical Risks
+### 5.1 Preventing Hallucinations
+- Use **Gemini 1.5 Pro** for reasoning reliability; validate generated content against curated datasets describing real job responsibilities.  
+- Restrict prompt temperature (≤ 0.4) and require factual grounding through “context inserts” (verified career data).  
+- Add a verification layer: outputs pass through rule-based filters to check for invented company names or tasks.
+
+### 5.2 Content Moderation
+- Employ Gemini’s **SafetySettings** for toxicity, self-harm, and sexual content filters.  
+- Sanitize user inputs using regex + Google Perspective API to prevent prompt injection or inappropriate content.
+
+### 5.3 Data Privacy
+- Store only anonymized session IDs and responses (no personal data).  
+- Encrypt all data at rest and in transit (PostgreSQL TLS, HTTPS).  
+- Users can delete their data at any time via profile settings.
+
+### 5.4 Bias Testing
+- Test scenario balance across gender, region, and career stereotypes.  
+- Implement bias-detection prompts (“Does this scenario assume gender or culture?”).  
+- Perform manual audits on 10 % of outputs per release.
+
+### 5.5 Disclaimers
+Displayed on every page:
+> ⚠️ **AI-Generated Simulation** – CareerSim provides educational insights only. It does **not** constitute certified career counseling or professional advice.
+
+---
+
+## 6. Prompt Engineering Strategy
+
+### 6.1 Scenario Generation Prompt
+Example: You are a simulation designer for realistic job experiences.
+Generate a short, role-specific scenario (200–300 words) for a {career_title}.
+Include a realistic problem, 3 decision options (A/B/C), and clear context.
+Avoid hallucinating company names or statistics. Output JSON with keys:
+{"scenario": "...", "options": ["A", "B", "C"]}
+
+
+### 6.2 Response Evaluation Prompt
+Example: You are an experienced professional in {career_title}.
+Evaluate the user's choice {user_answer} from the scenario below.
+Explain reasoning and assign a numeric score (0–10) for decision quality.
+Return JSON: {"feedback": "...", "score": number}
+
+
+### 6.3 Model Choice
+- **Gemini 1.5 Pro** for evaluation (accuracy > reasoning speed).  
+- **Gemini 1.5 Flash** for scenario generation (fast, low-cost).  
+- Prompt templates stored in backend; versioned for traceability.
+
+---
+
+## 7. Cost Calculation
+
+| Stage | Model | Tokens/Request | Requests/Session | Cost / 1K tokens | Total / Session |
+|--------|--------|----------------|------------------|------------------|----------------|
+| Scenario Generation | Gemini Flash | ~700 | 1 | $0.0003 | $0.21 |
+| Evaluation | Gemini Pro | ~500 | 2 | $0.0025 | $0.25 |
+| **Estimated Total** |  |  |  |  | **≈ $0.46/session** |
+
+*Optimizations:* compress JSON responses, cache repeated scenarios, and use batch evaluation for groups of users.
+
+---
+
+## 8. Risk Assessment
+
 | Risk | Likelihood | Impact | Mitigation |
 |------|-------------|---------|-------------|
-| Gemini API rate limits | Medium | Medium | Cache previous scenarios; stagger requests |
-| Poor scenario realism | Medium | High | Manual review and prompt iteration |
-| Assessment inaccuracy | Low | High | Multi-prompt evaluation; human benchmark tests |
-| Data loss | Low | High | Regular DB backups and error handling |
-
-### Product Risks
-| Risk | Likelihood | Impact | Mitigation |
-|------|-------------|---------|-------------|
-| Low user engagement | Medium | High | Add gamification and progress tracking |
-| Overly complex simulations | Medium | Medium | Start with simple, text-based scenarios |
-| Scope creep | Medium | Medium | Weekly milestone check-ins and strict scope control |
+| AI hallucination (fake info) | Medium | High | Low-temperature prompts + fact-checking filters |
+| Prompt injection | Medium | High | Sanitize inputs, strict schema validation |
+| Career bias/stereotypes | Medium | High | Bias testing and audits |
+| Data privacy violation | Low | High | Encrypt data, anonymize logs |
+| API failure/unavailability | Medium | Medium | Retry with exponential backoff + fallback text |
+| Low user engagement | Medium | Medium | Add gamification & badges |
+| Cost overrun | Low | Medium | Monitor token usage & limit free tier sessions |
 
 ---
 
-## 6. Research Plan
+## 9. Scoring & Error Handling
 
-**Technical Questions:**
-1. How to design effective prompt structures for realistic AI simulations?  
-2. How to quantify qualitative feedback from Gemini?  
-3. How to measure user engagement and perceived realism effectively?  
+### AI-to-Score Conversion
+- Gemini returns 0–10 score → backend averages last 3 scores per career → normalized to 0–100 scale.  
+- Results stored with timestamp and scenario ID.
 
-**Proof of Concept (Weeks 3–4):**
-- Simple “day in the life” simulation generated by Gemini  
-- User inputs and responses logged  
-- AI returns narrative feedback  
-
----
-
-## 7. User Study Plan
-
-**Participants:** 5–10 university students exploring career choices  
-**Goal:** Evaluate how realistic and helpful the simulation feels  
-**Metrics:**  
-- Perceived realism (1–5 scale)  
-- Usefulness for career choice decisions  
-- Likelihood to recommend  
-
-**Recruitment:**  
-University student groups and social media channels  
+### Error Handling
+- Retry failed API calls up to 3 times with increasing delay.  
+- If all fail, display fallback message:  
+  > “Simulation temporarily unavailable — please retry later.”
 
 ---
 
-## 8. Timeline
+## 10. User Study Plan
+
+**Participants:** 8–12 students and early-career users  
+**Metrics:**
+- Realism (Likert 1–5)  
+- Usefulness for decision-making  
+- Clarity of AI feedback  
+- Perceived fairness/bias  
+
+---
+
+## 11. Timeline
 
 | Week | Focus | Deliverables |
 |------|--------|--------------|
 | 1 | Setup | Repo, environment, team contract |
-| 2 | Research | Prompt design & Gemini integration |
-| 3 | Backend | Scenario generation endpoint |
-| 4 | Frontend | User input and response display |
-| 5 | AI | Assessment logic implementation |
-| 6 | DB | PostgreSQL connection & user data |
-| 7 | Testing | Internal simulation testing |
-| 8–10 | MVP | Full deployment and feedback round |
+| 2 | Prompt R&D | Basic Gemini Flash scenario tests |
+| 3 | Backend | FastAPI + PostgreSQL skeleton |
+| 4 | Frontend | React interface for simulations |
+| 5 | AI Evaluation | Gemini Pro scoring logic |
+| 6 | Privacy & Ethics | Moderation + bias testing |
+| 7 | Testing | End-to-end user flow |
+| 8–10 | MVP | Deployment + feedback collection |
 
 ---
 
-## 9. Budget
+## 12. Budget
 
-| Item | Est. Cost |
-|------|------------|
-| Gemini API | Free |
-| Hosting (Render/Vercel) | Free Tier |
-| PostgreSQL Hosting | Free Tier (Neon/Render) |
-| **Total** | **Free** |
+| Item | Est. Cost | Notes |
+|------|------------|-------|
+| Gemini API usage | $40 | Free tier + $10 credit/month |
+| Hosting (FastAPI + React) | Free | Render / Vercel free tier |
+| PostgreSQL DB | Free | Render / Neon free tier |
+| **Total** | **≈ $40** | Split among team |
 
 ---
 
-## 10. References
-- Google Gemini API Documentation  
-- FastAPI Framework Docs  
-- PostgreSQL Official Docs  
-- React + TailwindCSS Documentation  
+## 13. Team Contract Summary
+
+Our team meets twice weekly and tracks work through GitHub Projects. Each member owns specific components: Sopo – PM/docs, Toma – backend, Davit – AI integration, Temuri – frontend UX.  
+Conflicts are resolved through group discussion within 48 hours; unresolved issues escalate to the instructor.  
+See [docs/team-contract.md](./team-contract.md) for full details.
+
+---
+
+## 14. Contingency & Ethical Considerations
+
+If Gemini API becomes unavailable, fallback models (OpenAI GPT-4o mini or Claude Haiku) will be used temporarily.  
+All simulations undergo manual review before public release to ensure ethical and factual accuracy.
+
+---
+
+## 15. Revision History
+
+| Date | Change | Author |
+|------|---------|--------|
+| 2025-10-27 | Initial complete revision incorporating instructor feedback | Ascend.AI Team |
 
 ---
 
