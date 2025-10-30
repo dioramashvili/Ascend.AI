@@ -261,10 +261,10 @@
 
 ### 📝 Action Items from This Check-In
 
-*   **Schedule Frontend Performance Audit Session**: Temuri to schedule a deep-dive session with Toma (if needed) to investigate performance issues. - Owner: Temuri - Due: 2023-10-30
-*   **Create Monetization Strategy Brainstorm Session Invite**: Sopo to organize a 2-hour strategic session for the team. - Owner: Sopo - Due: 2023-10-30
-*   **Draft Scenario Content Guide Outline**: Davit to prepare an initial outline for the content guide for team review. - Owner: Davit - Due: 2023-11-03
-*   **Review updated Team Contract**: All members to review and confirm agreement on the updated team contract points. - Owner: All Team Members - Due: 2023-10-28
+*   **Schedule Frontend Performance Audit Session**: Temuri to schedule a deep-dive session with Toma (if needed) to investigate performance issues. - Owner: Temuri - Due: 2025-10-31
+*   **Create Monetization Strategy Brainstorm Session Invite**: Sopo to organize a 2-hour strategic session for the team. - Owner: Sopo - Due: 2025-11-02
+*   **Draft Scenario Content Guide Outline**: Davit to prepare an initial outline for the content guide for team review. - Owner: Davit - Due: 2025-11-03
+*   **Review updated Team Contract**: All members to review and confirm agreement on the updated team contract points. - Owner: All Team Members - Due: 2025-10-30
 
 ---
 
