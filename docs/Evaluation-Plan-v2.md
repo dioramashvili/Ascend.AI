@@ -119,7 +119,7 @@ We aim to measure success by validating AI accuracy, user experience, and system
 
 **Participants:** 5 users, target audience, $25 incentive each  
 
-**Tasks:** 3–5 core workflows with time limits and success criteria
+**Tasks:** 3-5 core workflows with time limits and success criteria
 
 **Data Collection:**  
 - **Quantitative:** Task completion, time on task, errors, clicks  
