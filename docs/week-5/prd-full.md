@@ -156,7 +156,7 @@ The system follows an **API-first** approach to ensure flexibility and easy futu
 |-------|-------------|----------|
 | **Frontend** | React.js,| Interactive UI, SSR for SEO |
 | **Backend** | FastAPI | API gateway, business logic |
-| **AI/NLP** | Python (FastAPI), OpenAI API, Hugging Face Transformers | Simulation generation, feedback, scoring |
+| **AI/NLP** | Gemini Pro + Flash | Simulation generation, feedback, scoring |
 | **Database** | PostgreSQL | Persistent data, unstructured storage, caching |
 | **Infrastructure** | AWS EC2/S3/RDS, Docker, GitHub Actions | Cloud hosting, containerization, CI/CD |
 | **Authentication** | JWT, OAuth 2.0 | Secure user management |
