@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import './App.css';
 
@@ -23,12 +24,11 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-
   const handleGenerateScenario = async () => {
     setIsLoading(true);
     setError(null);
-    setScenario(null); 
-    setEvaluation(null); 
+    setScenario(null);
+    setEvaluation(null);
 
     try {
       const response = await fetch(`${API_BASE_URL}/scenarios/generate`, {
@@ -50,14 +50,13 @@ function App() {
     }
   };
 
-  const handleEvaluateAnswer = async (answer: string) => {
-    if (!scenario) return; // Should not happen if buttons are visible
+  const handleEvaluateAnswer = async (optionIndex: number) => {
+    if (!scenario) return;
 
     setIsLoading(true);
     setError(null);
 
-    // The backend expects 'A', 'B', or 'C'
-    const selectedOptionLetter = answer.charAt(0);
+    const selectedOptionLetter = String.fromCharCode(65 + optionIndex); 
 
     try {
       const response = await fetch(`${API_BASE_URL}/evaluations/evaluate`, {
@@ -67,7 +66,7 @@ function App() {
           career_title: scenario.career_title,
           scenario_id: scenario.id,
           scenario_text: scenario.scenario_text,
-          user_answer: selectedOptionLetter,
+          user_answer: selectedOptionLetter, 
         }),
       });
 
@@ -87,12 +86,10 @@ function App() {
   };
 
 
-
   return (
     <div style={{ fontFamily: 'sans-serif', maxWidth: '800px', margin: 'auto', padding: '20px' }}>
       <h1>CareerSim Backend Test</h1>
       
-    
       <div style={{ marginBottom: '20px' }}>
         <input
           type="text"
@@ -115,10 +112,10 @@ function App() {
           <p>{scenario.scenario_text}</p>
           <h3>Options:</h3>
           <div>
-            {scenario.options.map((option) => (
+            {scenario.options.map((option, index) => (
               <button
                 key={option}
-                onClick={() => handleEvaluateAnswer(option)}
+                onClick={() => handleEvaluateAnswer(index)} 
                 disabled={isLoading}
                 style={{ margin: '5px' }}
               >
@@ -128,6 +125,7 @@ function App() {
           </div>
         </div>
       )}
+
       {evaluation && (
          <div style={{ border: '1px solid #0c0', padding: '15px', backgroundColor: '#f0fff0' }}>
            <h2>Evaluation Result</h2>

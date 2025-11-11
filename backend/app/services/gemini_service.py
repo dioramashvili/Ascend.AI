@@ -3,7 +3,7 @@ import json
 from typing import Dict, Any
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential
-from google.generativeai.types import HarmCategory, HarmBlockThreshold # <--- ADD THIS IMPORT
+from google.generativeai.types import HarmCategory, HarmBlockThreshold 
 
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -105,7 +105,7 @@ def _build_scenario_prompt(
 {focus_instruction}
 
 **Instructions:**
-1. Create a realistic workplace scenario (200-300 words)
+1. Create a realistic workplace scenario (100-130 words)
 2. Include specific context, stakeholders, and constraints
 3. Present a clear decision point or challenge
 4. Provide 3 distinct options (labeled A, B, C)
