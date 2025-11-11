@@ -1,31 +1,68 @@
+"""Main FastAPI application entry point."""
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-app = FastAPI()
+from fastapi.responses import JSONResponse
+
+from app.config import get_settings
+from app.core.logging import configure_logging, get_logger
+
+settings = get_settings()
+logger = get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator:
+    """Application lifespan events."""
+    configure_logging(settings.log_level)
+    logger.info(
+        "application.startup",
+        app_name=settings.app_name,
+        environment=settings.environment,
+    )
+    
+    yield
+    
+    logger.info("application.shutdown")
+
+
+app = FastAPI(
+    title=settings.app_name,
+    description="AI-powered career experience simulator",
+    version="1.0.0",
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], 
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/")
-def read_root():
-    return {"Project": "CareerSim API"}
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok"}
+async def health_check():
+    """Health check endpoint."""
+    return JSONResponse(
+        content={
+            "status": "healthy",
+            "app": settings.app_name,
+            "environment": settings.environment,
+        }
+    )
 
 
-class ScenarioRequest(BaseModel):
-    career_title: str
-
-@app.post("/api/v1/simulations/generate")
-def generate_mock_scenario(request: ScenarioRequest):
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    logger.info("root.endpoint.called")
     return {
-        "scenario": f"This is a mock scenario for a {request.career_title}. What do you do?",
-        "options": ["Option A", "Option B", "Option C"]
+        "message": f"Welcome to {settings.app_name}",
+        "docs": "/docs" if settings.debug else "Documentation disabled in production",
     }

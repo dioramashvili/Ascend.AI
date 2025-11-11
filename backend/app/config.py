@@ -1,37 +1,72 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    APP_NAME: str = "CareerSim"
-    DEBUG: bool = False
     
-    SECRET_KEY: str
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # Application
+    app_name: str = "CareerSim"
+    debug: bool = False
+    environment: str = "production"
+    secret_key: str
     
-    SUPABASE_URL: str
-    SUPABASE_KEY: str  
-    SUPABASE_SERVICE_KEY: str 
+    # Supabase
+    supabase_url: str
+    supabase_key: str
+    supabase_service_key: str
     
-    REDIS_URL: str
-    REDIS_CACHE_TTL: int = 3600
+    # Gemini AI
+    gemini_api_key: str
+    gemini_model_flash: str = "gemini-2.0-flash-exp"
+    gemini_model_pro: str = "gemini-pro"
+    gemini_temperature_generation: float = 0.7
+    gemini_temperature_evaluation: float = 0.3
+    gemini_max_tokens: int = 2000
     
-    GEMINI_API_KEY: str
-    GEMINI_MODEL_FLASH: str = "gemini-2.0-flash-exp"
-    GEMINI_MODEL_PRO: str = "gemini-1.5-pro-latest"
-    GEMINI_TEMPERATURE: float = 0.4
-    GEMINI_MAX_TOKENS: int = 1000
+    # Redis
+    redis_host: str = "redis"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: Optional[str] = None
     
-    RATE_LIMIT_PER_MINUTE: int = 10
+    # Celery
+    celery_broker_url: str
+    celery_result_backend: str
     
-    SENTRY_DSN: str = ""
+    # Security
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    # Rate Limiting
+    rate_limit_per_minute: int = 10
+    rate_limit_per_hour: int = 100
+    
+    # Logging
+    log_level: str = "INFO"
+    
+    # CORS
+    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    
+    # Cache TTL (in seconds)
+    cache_ttl_scenario: int = 3600  # 1 hour
+    cache_ttl_evaluation: int = 1800  # 30 minutes
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False
+    )
+    
+    @property
+    def redis_url(self) -> str:
+        """Construct Redis URL."""
+        password_part = f":{self.redis_password}@" if self.redis_password else ""
+        return f"redis://{password_part}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
 
 @lru_cache()
 def get_settings() -> Settings:
+    """Get cached settings instance."""
     return Settings()
-
-settings = get_settings()
