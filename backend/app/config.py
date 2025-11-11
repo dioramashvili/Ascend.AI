@@ -18,8 +18,7 @@ class Settings(BaseSettings):
     
     # Gemini AI
     gemini_api_key: str
-    gemini_model_flash: str = "gemini-2.0-flash-exp"
-    gemini_model_pro: str = "gemini-pro"
+    gemini_model_flash: str = "gemini-2.5-flash"
     gemini_temperature_generation: float = 0.7
     gemini_temperature_evaluation: float = 0.3
     gemini_max_tokens: int = 2000
