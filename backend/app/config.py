@@ -29,11 +29,7 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_db: int = 0
     redis_password: Optional[str] = None
-    
-    # Celery
-    celery_broker_url: str
-    celery_result_backend: str
-    
+
     # Security
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
