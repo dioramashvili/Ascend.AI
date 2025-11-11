@@ -3,7 +3,7 @@ from app.config import get_settings
 from app.core.security import get_password_hash
 
 settings = get_settings()
-supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+supabase = create_client(settings.supabase_url, settings.supabase_key)
 
 # Create a new user
 async def create_user(user):
