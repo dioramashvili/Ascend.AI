@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.api.routes import scenarios, evaluations
+
 
 settings = get_settings()
 logger = get_logger(__name__)
@@ -36,6 +38,9 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
     lifespan=lifespan,
 )
+# Include routers
+app.include_router(scenarios.router, prefix="/api")
+app.include_router(evaluations.router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
