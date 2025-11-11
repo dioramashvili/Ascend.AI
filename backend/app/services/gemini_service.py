@@ -3,6 +3,7 @@ import json
 from typing import Dict, Any
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential
+from google.generativeai.types import HarmCategory, HarmBlockThreshold # <--- ADD THIS IMPORT
 
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -44,6 +45,12 @@ async def generate_scenario(
             generation_config={
                 "temperature": settings.gemini_temperature_generation,
                 "max_output_tokens": settings.gemini_max_tokens,
+            },
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             }
         )
         
