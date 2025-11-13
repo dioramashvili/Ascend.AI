@@ -46,7 +46,25 @@ async def save_evaluation(
     score: int,
     feedback: str
 ):
-    """Placeholder for saving an evaluation to the database."""
-    print(f"MOCK: 'Saving' evaluation for scenario {scenario_id} by user {user_id}")
-    # Does nothing, just pretends to save.
-    pass
+    """Save an evaluation to the Supabase 'evaluations' table."""
+    try:
+        data = {
+            "user_id": user_id,
+            "scenario_id": scenario_id,
+            "user_answer": user_answer,
+            "score": score,
+            "feedback": feedback
+        }
+
+        response = supabase.table("evaluations").insert(data).execute()
+
+        if response.data:
+            print(f"✅ Saved evaluation for user {user_id} and scenario {scenario_id}")
+        else:
+            print(f"⚠️ Failed to save evaluation: {response.error}")
+        
+        return response.data
+
+    except Exception as e:
+        print(f"❌ Error saving evaluation: {e}")
+        return None

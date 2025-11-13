@@ -154,7 +154,36 @@ def _validate_scenario_response(result: Dict[str, Any]) -> None:
         raise ValueError("Scenario text is too long (maximum 2000 characters)")
 
 
-# Keep the evaluation function from before
+
+def _build_evaluation_prompt(
+    career_title: str,
+    scenario_text: str,
+    user_answer: str
+) -> str:
+    """Build the prompt for evaluating a user's answer."""
+    return f"""You are an expert career coach for the role of a {career_title}.
+A user was presented with the following scenario and made a choice.
+
+**Scenario:**
+---
+{scenario_text}
+---
+
+**User's Answer:**
+They chose option '{user_answer}'.
+
+**Your Task:**
+Evaluate the user's choice. Provide constructive feedback in 1-2 sentences, a  explanation, and a score.
+The score should be from 0 (very poor choice) to 10 (excellent choice).
+Your tone should be encouraging and professional.
+
+Return your response in this EXACT JSON format (no markdown or extra text):
+{{
+  "feedback": "A concise summary of the feedback for the user's choice.",
+  "score": <a number from 0 to 10>,
+  "explanation": "A more detailed explanation  in 10 or more words of why the choice was good or bad, and what the trade-offs were."
+}}
+"""
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10)
@@ -165,6 +194,41 @@ async def generate_evaluation(
     user_answer: str
 ) -> Dict[str, Any]:
     """
-    [Previous implementation stays the same]
+    Evaluates a user's answer using Gemini and returns feedback and a score.
     """
-    # ... (your previous evaluation code)
+    prompt = _build_evaluation_prompt(career_title, scenario_text, user_answer)
+    try:
+        # Use a more capable model for nuanced evaluation if needed, but flash is fine for testing.
+        model = genai.GenerativeModel(settings.gemini_model_flash)
+        response = await model.generate_content_async(
+            prompt,
+            generation_config={
+                "temperature": settings.gemini_temperature_evaluation,
+                "max_output_tokens": 1000,
+            },
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            }
+        )
+        result = json.loads(response.text)
+        
+        # Basic validation
+        if not all(k in result for k in ["feedback", "score", "explanation"]):
+            raise ValueError("Evaluation response from AI is missing required keys.")
+        
+        logger.info("gemini.evaluation.success", score=result.get("score"))
+        return result
+
+    except json.JSONDecodeError as e:
+        logger.error(
+            "gemini.evaluation.json_parse_error",
+            error=str(e),
+            response_text=response.text[:500]
+        )
+        raise ValueError("Failed to parse AI evaluation response")
+    except Exception as e:
+        logger.error("gemini.evaluation.api_error", error=str(e))
+        raise
