@@ -183,6 +183,8 @@ Return your response in this EXACT JSON format (no markdown or extra text):
   "score": <a number from 0 to 10>,
   "explanation": "A more detailed explanation  in 10 or more words of why the choice was good or bad, and what the trade-offs were."
 }}
+Remember: Return ONLY valid JSON, no markdown formatting or extra text.
+
 """
 @retry(
     stop=stop_after_attempt(3),
@@ -232,3 +234,4 @@ async def generate_evaluation(
     except Exception as e:
         logger.error("gemini.evaluation.api_error", error=str(e))
         raise
+    
