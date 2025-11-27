@@ -58,6 +58,14 @@ function App() {
 
     const selectedOptionLetter = String.fromCharCode(65 + optionIndex); 
 
+// Combine the story and the options so the AI knows what the choices were
+    const fullContext = `
+${scenario.scenario_text}
+
+Options:
+${scenario.options.join('\n')}
+    `;
+
     try {
       const response = await fetch(`${API_BASE_URL}/evaluations/evaluate`, {
         method: 'POST',
@@ -65,7 +73,7 @@ function App() {
         body: JSON.stringify({
           career_title: scenario.career_title,
           scenario_id: scenario.id,
-          scenario_text: scenario.scenario_text,
+          scenario_text: fullContext, // <--- SEND FULL CONTEXT
           user_answer: selectedOptionLetter, 
         }),
       });
