@@ -161,30 +161,35 @@ def _build_evaluation_prompt(
     user_answer: str
 ) -> str:
     """Build the prompt for evaluating a user's answer."""
-    return f"""You are an expert career coach for the role of a {career_title}.
-A user was presented with the following scenario and made a choice.
+    return f"""You are an AI evaluator for a **fictional educational career simulation**. 
+The following is a hypothetical workplace scenario designed for training purposes only. 
+It involves professional challenges and simulated workplace conflicts.
 
-**Scenario:**
+**Context:**
+Role: {career_title}
+Task: Evaluate the user's decision objectively based on standard industry best practices.
+
+**Hypothetical Scenario:**
 ---
 {scenario_text}
 ---
 
-**User's Answer:**
-They chose option '{user_answer}'.
 
-**Your Task:**
-Evaluate the user's choice. Provide constructive feedback in 1-2 sentences, a  explanation, and a score.
-The score should be from 0 (very poor choice) to 10 (excellent choice).
-Your tone should be encouraging and professional.
+**User's Decision:**
+The user selected Option {user_answer}.
 
-Return your response in this EXACT JSON format (no markdown or extra text):
+**Instructions:**
+1. Identify the text corresponding to Option {user_answer} in the scenario above.
+2. Analyze why this choice is effective or ineffective in this specific context.
+3. Provide constructive, professional feedback.
+4. Assign a score from 0 (poor) to 10 (excellent).
+
+Return your response in this EXACT JSON format (no markdown):
 {{
-  "feedback": "A concise summary of the feedback for the user's choice.",
-  "score": <a number from 0 to 10>,
-  "explanation": "A more detailed explanation  in 10 or more words of why the choice was good or bad, and what the trade-offs were."
+  "feedback": "A concise summary of the feedback.",
+  "score": <number>,
+  "explanation": "A detailed explanation of the trade-offs and reasoning."
 }}
-Remember: Return ONLY valid JSON, no markdown formatting or extra text.
-
 """
 @retry(
     stop=stop_after_attempt(3),
@@ -200,13 +205,15 @@ async def generate_evaluation(
     """
     prompt = _build_evaluation_prompt(career_title, scenario_text, user_answer)
     try:
-        # Use a more capable model for nuanced evaluation if needed, but flash is fine for testing.
         model = genai.GenerativeModel(settings.gemini_model_flash)
+        
         response = await model.generate_content_async(
             prompt,
             generation_config={
                 "temperature": settings.gemini_temperature_evaluation,
                 "max_output_tokens": 1000,
+                # ADD THIS LINE: Forces the model to return strictly JSON
+                "response_mime_type": "application/json", 
             },
             safety_settings={
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -215,6 +222,18 @@ async def generate_evaluation(
                 HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             }
         )
+
+        # CHECK FOR SAFETY BLOCK BEFORE ACCESSING .text
+        if response.candidates and response.candidates[0].finish_reason != 1: # 1 is STOP (Success)
+             logger.warning(f"Gemini blocked response. Finish reason: {response.candidates[0].finish_reason}")
+             # Return a fallback response instead of crashing
+             return {
+                 "feedback": "Unable to evaluate detailed feedback due to content safety filters. However, your answer has been recorded.",
+                 "score": 5,
+                 "explanation": "The AI model flagged the scenario context as sensitive and could not generate a detailed critique."
+             }
+
+        # Parse JSON
         result = json.loads(response.text)
         
         # Basic validation
@@ -228,10 +247,10 @@ async def generate_evaluation(
         logger.error(
             "gemini.evaluation.json_parse_error",
             error=str(e),
-            response_text=response.text[:500]
+            # Add safe access to response.text in logging
+            response_text=getattr(response, 'text', 'Blocked/Empty')[:500] 
         )
         raise ValueError("Failed to parse AI evaluation response")
     except Exception as e:
         logger.error("gemini.evaluation.api_error", error=str(e))
         raise
-    
