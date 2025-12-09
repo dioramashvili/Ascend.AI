@@ -1,7 +1,7 @@
 # Evaluation Notes  
 **Lab 6: Function Calling & Structured Outputs**  
 **Project:** CareerSim Platform  
-**Team:** AI Career Simulation Team  
+**Team:** Ascend.AI 
 
 ---
 
