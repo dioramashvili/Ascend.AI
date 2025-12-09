@@ -44,7 +44,8 @@ async def generate_scenario(request: ScenarioRequest):
         scenario = await scenario_service.generate_career_scenario(
             career_title=request.career_title,
             difficulty=request.difficulty,
-            focus_area=request.focus_area
+            focus_area=request.focus_area,
+            is_coding=request.is_coding
         )
         
         logger.info(

@@ -13,7 +13,6 @@ logger = get_logger(__name__)
 
 genai.configure(api_key=settings.gemini_api_key)
 
-
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10)
@@ -21,23 +20,20 @@ genai.configure(api_key=settings.gemini_api_key)
 async def generate_scenario(
     career_title: str,
     difficulty: str = "intermediate",
-    focus_area: str = None
+    focus_area: str = None,
+    is_coding: bool = False
 ) -> Dict[str, Any]:
     """
-    Generate a career scenario using Gemini Flash (faster, cheaper).
-    
-    Returns:
-        Dict with keys:
-        - scenario: Full scenario text (200-300 words)
-        - options: List of 3 choices (A, B, C)
-        - context: Additional background info
-        - correct_option: Optional "best" answer
+    Generate a career scenario using Gemini Flash.
     """
     
-    prompt = _build_scenario_prompt(career_title, difficulty, focus_area)
+    # 1. Choose the prompt
+    if is_coding:
+        prompt = _build_coding_scenario_prompt(career_title, difficulty)
+    else:
+        prompt = _build_scenario_prompt(career_title, difficulty, focus_area)
     
     try:
-        # Use Flash model for scenario generation (cheaper)
         model = genai.GenerativeModel(settings.gemini_model_flash)
         
         response = await model.generate_content_async(
@@ -45,6 +41,8 @@ async def generate_scenario(
             generation_config={
                 "temperature": settings.gemini_temperature_generation,
                 "max_output_tokens": settings.gemini_max_tokens,
+                # IMPORTANT: Keep this to ensure the code snippet doesn't break JSON
+                "response_mime_type": "application/json", 
             },
             safety_settings={
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -54,16 +52,30 @@ async def generate_scenario(
             }
         )
         
+        # Check for Safety Block
+        if response.candidates and response.candidates[0].finish_reason != 1:
+            logger.warning(f"Gemini blocked request. Finish reason: {response.candidates[0].finish_reason}")
+            raise ValueError("AI Safety Filter blocked this request.")
+
         # Parse JSON response
         result = json.loads(response.text)
         
-        # Validate response structure
-        _validate_scenario_response(result)
+        # --- NEW VALIDATION LOGIC ---
+        if is_coding:
+            # For coding, we just check if 'initial_code' exists.
+            # We SKIP the strict "3 options" check.
+            if "initial_code" not in result:
+                raise ValueError("AI failed to generate 'initial_code' field")
+        else:
+            # For normal scenarios, we run the strict validation (must have 3 options)
+            _validate_scenario_response(result)
+        # ----------------------------
         
         logger.info(
             "gemini.scenario.success",
             career_title=career_title,
-            difficulty=difficulty
+            difficulty=difficulty,
+            is_coding=is_coding
         )
         
         return result
@@ -72,14 +84,26 @@ async def generate_scenario(
         logger.error(
             "gemini.json_parse_error",
             error=str(e),
-            response_text=response.text[:500]  # Log first 500 chars
+            response_text=getattr(response, 'text', 'Blocked')[:500]
         )
         raise ValueError("Failed to parse AI response")
         
     except Exception as e:
         logger.error("gemini.api_error", error=str(e))
         raise
-
+def _build_coding_scenario_prompt(career_title: str, difficulty: str) -> str:
+    return f"""You are a technical interviewer creating a coding challenge for a {career_title}.
+    
+    Create a hipothetical coding scenario involving a bug or a missing feature in 10-20 lines.
+    
+    Return EXACT JSON:
+    {{
+      "scenario": "Description of the bug/task (e.g., 'The calculate_total function is failing negative numbers')",
+      "initial_code": "The buggy or incomplete code snippet (Python/JS/Java)",
+      "options": [], 
+      "context": "Brief tech stack context"
+    }}
+    """
 
 def _build_scenario_prompt(
     career_title: str,

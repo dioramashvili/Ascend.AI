@@ -35,7 +35,8 @@ SUPPORTED_CAREERS = [
 async def generate_career_scenario(
     career_title: str,
     difficulty: str = "intermediate",
-    focus_area: Optional[str] = None
+    focus_area: Optional[str] = None,
+    is_coding: bool = False
 ) -> Dict[str, Any]:
     """
     Generate a new career scenario with intelligent caching.
@@ -89,7 +90,8 @@ async def generate_career_scenario(
         gemini_response = await gemini_service.generate_scenario(
             career_title=career_title,
             difficulty=difficulty,
-            focus_area=focus_area
+            focus_area=focus_area,
+            is_coding=is_coding
         )
     except Exception as e:
         logger.error("scenario.gemini_failed", error=str(e))
@@ -109,7 +111,8 @@ async def generate_career_scenario(
         "difficulty": difficulty,
         "focus_area": focus_area,
         "scenario_text": gemini_response["scenario"],
-        "options": gemini_response["options"],
+        "options": gemini_response.get("options", []), 
+        "initial_code": gemini_response.get("initial_code"), 
         "correct_option": gemini_response.get("correct_option"),  # Optional
         "context": gemini_response.get("context", ""),
         "created_at": datetime.utcnow().isoformat(),
