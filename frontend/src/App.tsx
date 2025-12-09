@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import './App.css';
 
@@ -7,6 +6,7 @@ interface Scenario {
   career_title: string;
   scenario_text: string;
   options: string[];
+  initial_code?: string;
 }
 
 interface Evaluation {
@@ -18,23 +18,30 @@ interface Evaluation {
 const API_BASE_URL = 'http://localhost:8000/api';
 
 function App() {
-  const [careerTitle, setCareerTitle] = useState('software engineer');
+  const [careerTitle, setCareerTitle] = useState('');
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [isCodingSimulation, setIsCodingSimulation] = useState(false);
+  const [userCode, setUserCode] = useState(''); 
 
   const handleGenerateScenario = async () => {
     setIsLoading(true);
     setError(null);
     setScenario(null);
     setEvaluation(null);
+    setUserCode(''); 
 
     try {
       const response = await fetch(`${API_BASE_URL}/scenarios/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ career_title: careerTitle }),
+        body: JSON.stringify({ 
+          career_title: careerTitle, 
+          is_coding: isCodingSimulation 
+        }),
       });
 
       if (!response.ok) {
@@ -43,6 +50,10 @@ function App() {
 
       const data: Scenario = await response.json();
       setScenario(data);
+      
+      if (data.initial_code) {
+        setUserCode(data.initial_code);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -50,21 +61,19 @@ function App() {
     }
   };
 
-  const handleEvaluateAnswer = async (optionIndex: number) => {
+  const handleEvaluate = async (answerPayload: string) => {
     if (!scenario) return;
 
     setIsLoading(true);
     setError(null);
 
-    const selectedOptionLetter = String.fromCharCode(65 + optionIndex); 
-
-// Combine the story and the options so the AI knows what the choices were
-    const fullContext = `
-${scenario.scenario_text}
-
-Options:
-${scenario.options.join('\n')}
-    `;
+          let fullContext = scenario.scenario_text;
+    
+    if (isCodingSimulation) {
+        fullContext += `\n\nOriginal Buggy Code:\n${scenario.initial_code}`;
+    } else {
+        fullContext += `\n\nOptions:\n${scenario.options.join('\n')}`;
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/evaluations/evaluate`, {
@@ -73,8 +82,8 @@ ${scenario.options.join('\n')}
         body: JSON.stringify({
           career_title: scenario.career_title,
           scenario_id: scenario.id,
-          scenario_text: fullContext, // <--- SEND FULL CONTEXT
-          user_answer: selectedOptionLetter, 
+          scenario_text: fullContext, 
+          user_answer: answerPayload, 
         }),
       });
 
@@ -93,53 +102,92 @@ ${scenario.options.join('\n')}
     }
   };
 
-
   return (
-    <div style={{ fontFamily: 'sans-serif', maxWidth: '800px', margin: 'auto', padding: '20px' }}>
-      <h1>CareerSim Backend Test</h1>
+    <div className="app-root" >
+      <h1>Ascend.AI Career Simulator</h1>
       
-      <div style={{ marginBottom: '20px' }}>
+      
+      <div className="control-panel" >
         <input
           type="text"
           value={careerTitle}
           onChange={(e) => setCareerTitle(e.target.value)}
-          placeholder="Enter a career title"
-          style={{ padding: '8px', marginRight: '10px' }}
+          placeholder="e.g. Python Developer"
+          style={{ padding: '8px', flex: 1 }}
         />
-        <button onClick={handleGenerateScenario} disabled={isLoading}>
-          Generate Scenario
+        
+        <label className="checkbox" >
+          <input 
+            type="checkbox" 
+            checked={isCodingSimulation} 
+            onChange={(e) => setIsCodingSimulation(e.target.checked)} 
+          />
+          Coding Mode
+        </label>
+
+        <button 
+          onClick={handleGenerateScenario} 
+          disabled={isLoading || !careerTitle}
+          className='generate-button'
+        >
+         {isLoading ? 'Generating...' : 'Start'}
         </button>
       </div>
 
-      {isLoading && <p>Loading...</p>}
-      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
+      {error && <div className="error-message" >Error: {error}</div>}
 
       {scenario && (
-        <div style={{ border: '1px solid #ccc', padding: '15px', marginBottom: '20px' }}>
-          <h2>Scenario: {scenario.career_title}</h2>
-          <p>{scenario.scenario_text}</p>
-          <h3>Options:</h3>
-          <div>
-            {scenario.options.map((option, index) => (
-              <button
-                key={option}
-                onClick={() => handleEvaluateAnswer(index)} 
+        <div className="scenario-container" >
+          <span className="scenario-title">{scenario.career_title}</span>
+          <h2>Scenario Challenge</h2>
+          <p style={{ lineHeight: '1.6' }}>{scenario.scenario_text}</p>
+          
+          {isCodingSimulation ? (
+            <div >
+              <h3>Fix the Code:</h3>
+              <textarea 
+                value={userCode}
+                onChange={(e) => setUserCode(e.target.value)}
+                className='text-area'
+              />
+              <br />
+              <button 
+                onClick={() => handleEvaluate(userCode)}
                 disabled={isLoading}
-                style={{ margin: '5px' }}
+                className='evaluate-button'
               >
-                {option}
+                Submit Solution
               </button>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className='options-div'>
+              <h3>Choose the best action:</h3>
+              <div className='options-list'>
+                {scenario.options.map((option, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleEvaluate(String.fromCharCode(65 + index))} 
+                    disabled={isLoading}
+                    
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {evaluation && (
-         <div style={{ border: '1px solid #0c0', padding: '15px', backgroundColor: '#f0fff0' }}>
-           <h2>Evaluation Result</h2>
+         <div className="evaluation-div">
+           <h2 >Evaluation Result</h2>
+           <div className="score">
+             Score: {evaluation.score} / 10
+           </div>
            <p><strong>Feedback:</strong> {evaluation.feedback}</p>
-           <p><strong>Score:</strong> {evaluation.score} / 10</p>
-           <p><strong>Explanation:</strong> {evaluation.explanation}</p>
+           <hr />
+           <p >{evaluation.explanation}</p>
          </div>
       )}
     </div>

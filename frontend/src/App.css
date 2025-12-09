@@ -1,0 +1,138 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow-x: hidden; 
+}
+
+#root {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.app-root {
+    background-color: rgb(63, 63, 139);
+    max-height: 100vh;
+    width: 100%; 
+    font-family: sans-serif;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.start-button {
+    border-radius: 5vw;
+    background-color: mediumslateblue;
+}
+.control-panel {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f5f5f5;
+    border-radius: 8px;
+ 
+}
+.checkbox {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+.generate-button {
+    padding: 8px 16px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.error-message {
+    color: red;
+    margin-bottom: 20px;
+}
+.evaluation-div {
+    border: 1px solid #28a745;
+    border-radius: 8px;
+    padding: 20px;
+    background-color: #f0fff0;
+}
+.evaluation-div:hr{
+border-color: #28a745;
+opacity: 0.3;
+}
+.evaluation-div h2 {
+    color: #28a745;
+    margin-top: 0;
+}
+.evaluation-div p {
+    font-style: italic;
+    color: #555;
+}
+.evaluation-div .score {
+    font-size: 2em;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+.scenario-container {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.scenario-title {
+    background: #80d30b;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    text-transform: uppercase;
+}
+.text-area {
+    width: 100%;
+    height: 200px;
+    font-family: monospace;
+    padding: 10px;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 4px;
+}
+.evaluate-button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.evaluate-button:hover{
+    background-color: #94d3a2;
+        
+
+}
+.options-div {
+    margin-top: 20px;
+}
+.options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.options-list button {
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+}   
+.options-list button:hover {
+    background-color: rgb(63, 63, 139);
+}
