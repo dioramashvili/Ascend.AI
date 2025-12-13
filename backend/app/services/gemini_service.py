@@ -70,7 +70,13 @@ async def generate_scenario(
             # For normal scenarios, we run the strict validation (must have 3 options)
             _validate_scenario_response(result)
         # ----------------------------
-        
+        if response.usage_metadata:
+            result['input_tokens'] = response.usage_metadata.prompt_token_count
+            result['output_tokens'] = response.usage_metadata.candidates_token_count
+        else:
+            result['input_tokens'] = 0
+            result['output_tokens'] = 0
+
         logger.info(
             "gemini.scenario.success",
             career_title=career_title,

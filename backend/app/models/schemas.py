@@ -46,6 +46,8 @@ class ScenarioResponse(BaseModel):
     context: Optional[str] = None
     created_at: str
     cached: bool = False
+    input_tokens: Optional[int] = 0
+    output_tokens: Optional[int] = 0
 
 class ScenarioListResponse(BaseModel):
     """Response containing multiple scenarios."""
