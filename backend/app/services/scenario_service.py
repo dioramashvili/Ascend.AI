@@ -2,6 +2,8 @@
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import uuid
+import asyncio
+import hashlib
 
 from app.services import gemini_service, cache_service
 from app.services.supabase_service import (
@@ -93,15 +95,36 @@ async def generate_career_scenario(
             focus_area=focus_area,
             is_coding=is_coding
         )
-    except Exception as e:
-        logger.error("scenario.gemini_failed", error=str(e))
-        
+    except ValueError as e:
+        # Business logic errors (validation, etc.)
+        logger.error(
+            "scenario.gemini_validation_failed",
+            error=str(e),
+            career_title=career_title,
+            difficulty=difficulty,
+            focus_area=focus_area
+        )
         # Fallback to pre-written scenario if available
         if fallback := await _get_fallback_scenario(career_title, difficulty):
             logger.warning("scenario.using_fallback", career_title=career_title)
             return fallback
-        
-        raise ValueError(f"Failed to generate scenario for {career_title}")
+        raise ValueError(f"Failed to generate scenario for {career_title}: {str(e)}")
+    except Exception as e:
+        # Unexpected errors (API failures, network issues, etc.)
+        logger.error(
+            "scenario.gemini_api_failed",
+            error=str(e),
+            error_type=type(e).__name__,
+            career_title=career_title,
+            difficulty=difficulty,
+            focus_area=focus_area,
+            exc_info=True
+        )
+        # Fallback to pre-written scenario if available
+        if fallback := await _get_fallback_scenario(career_title, difficulty):
+            logger.warning("scenario.using_fallback", career_title=career_title)
+            return fallback
+        raise ValueError(f"Failed to generate scenario for {career_title}: {str(e)}")
     
     # 5. Enrich with metadata
     scenario_id = str(uuid.uuid4())
@@ -116,22 +139,31 @@ async def generate_career_scenario(
         "correct_option": gemini_response.get("correct_option"),  # Optional
         "context": gemini_response.get("context", ""),
         "created_at": datetime.utcnow().isoformat(),
-        "cached": False
+        "cached": False,
+        "input_tokens": gemini_response.get("input_tokens", 0),
+        "output_tokens": gemini_response.get("output_tokens", 0)
     }
     
-    # 6. Save to database (non-blocking, best effort)
-    try:
-        await save_scenario(scenario)
-    except Exception as e:
-        # Don't fail the request if DB save fails
-        logger.error("scenario.db_save_failed", error=str(e))
-    
-    # 7. Cache the result
+    # 6. Cache the result (do this first for faster response)
     await cache_service.set_cached(
         key=cache_key,
         value=scenario,
         ttl=settings.cache_ttl_scenario  # 1 hour default
     )
+    
+    # 7. Save to database (truly non-blocking fire-and-forget using background task)
+    # This doesn't block the response - returns immediately after caching
+    async def _save_scenario_background():
+        """Background task to save scenario without blocking response."""
+        try:
+            await save_scenario(scenario)
+            logger.info("scenario.db_saved_background", scenario_id=scenario_id)
+        except Exception as e:
+            # Don't fail the request if DB save fails
+            logger.error("scenario.db_save_failed", error=str(e), scenario_id=scenario_id)
+    
+    # Create background task - doesn't block, runs independently
+    asyncio.create_task(_save_scenario_background())
     
     logger.info(
         "scenario.generated",
@@ -263,11 +295,14 @@ def _generate_scenario_cache_key(
     difficulty: str,
     focus_area: Optional[str]
 ) -> str:
-    """Generate cache key for scenario."""
+    """Generate cache key for scenario.
+    
+    Optimized: hashlib imported at module level to avoid repeated imports.
+    """
     base_key = f"scenario:{career_title}:{difficulty}"
     
     if focus_area:
-        import hashlib
+        # Use module-level hashlib import (optimization)
         focus_hash = hashlib.md5(focus_area.encode()).hexdigest()[:8]
         base_key += f":{focus_hash}"
     

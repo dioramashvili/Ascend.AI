@@ -1,5 +1,7 @@
 """Evaluation business logic and orchestration."""
 from typing import Dict, Any
+import asyncio
+import hashlib
 from app.services import gemini_service, cache_service
 from app.services.supabase_service import save_evaluation
 from app.core.logging import get_logger
@@ -67,35 +69,44 @@ async def evaluate_user_answer(
         "cached": False
     }
     
-    # 5. Cache the result
+    # 5. Cache the result (do this first for faster response)
     await cache_service.set_cached(
         key=cache_key,
         value=result,
         ttl=1800  # 30 minutes
     )
     
-    # 6. Save to database (non-blocking, fire-and-forget)
-    try:
-        if user_id:
-            await save_evaluation(
-                user_id=user_id,
-                scenario_id=scenario_id,
-                user_answer=user_answer,
-                score=evaluation["score"],
-                feedback=evaluation["feedback"]
-            )
-    except Exception as e:
-        # Don't fail the request if DB save fails
-        logger.error("evaluation.db_save_failed", error=str(e))
+    # 6. Save to database (truly non-blocking fire-and-forget using background task)
+    # This doesn't block the response - returns immediately after caching
+    if user_id:
+        async def _save_evaluation_background():
+            """Background task to save evaluation without blocking response."""
+            try:
+                await save_evaluation(
+                    user_id=user_id,
+                    scenario_id=scenario_id,
+                    user_answer=user_answer,
+                    score=evaluation["score"],
+                    feedback=evaluation["feedback"]
+                )
+                logger.info("evaluation.db_saved_background", scenario_id=scenario_id)
+            except Exception as e:
+                # Don't fail the request if DB save fails
+                logger.error("evaluation.db_save_failed", error=str(e), scenario_id=scenario_id)
+        
+        # Create background task - doesn't block, runs independently
+        asyncio.create_task(_save_evaluation_background())
     
     return result
 
 
 def _generate_cache_key(career_title: str, scenario_id: str, user_answer: str) -> str:
-    """Generate a unique cache key for an evaluation."""
-    import hashlib
+    """Generate a unique cache key for an evaluation.
     
+    Optimized: hashlib imported at module level to avoid repeated imports.
+    """
     # Hash the answer to keep key length reasonable
+    # Use module-level hashlib import (optimization)
     answer_hash = hashlib.md5(user_answer.encode()).hexdigest()[:8]
     
     return f"eval:{career_title}:{scenario_id}:{answer_hash}"
