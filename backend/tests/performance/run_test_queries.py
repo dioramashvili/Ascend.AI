@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Lab 9 - Runs 51 test queries and logs metrics.
+Test script for Lab 9 - Runs 40 test queries and logs metrics.
 Adapted for CareerSim API endpoints.
 
 Usage: 
@@ -90,10 +90,16 @@ async def run_single_query(client: httpx.AsyncClient, query: dict, index: int) -
             data = response.json()
             i_tokens = data.get('input_tokens', 0)
             o_tokens = data.get('output_tokens', 0)
-            # Gemini Flash Pricing
+            # Gemini Flash Pricing (per 1M tokens)
+            # Input: $0.35 per 1M tokens, Output: $1.05 per 1M tokens
             cost = (i_tokens / 1_000_000 * 0.35) + (o_tokens / 1_000_000 * 1.05)
         else:
-            error_msg = response.text[:200]
+            # Try to extract detailed error message
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('detail', response.text[:200])
+            except:
+                error_msg = response.text[:200]
         
         return {
             "index": index + 1,
@@ -153,24 +159,91 @@ async def run_all_tests():
         "total_duration_seconds": round(total_latency, 4),
         "details": results
     }
-    filename = "lab9_metrics.json"
-    with open(filename, "w") as f:
+    # Save to both backend root and lab9 folder
+    filename_backend = "lab9_metrics.json"
+    filename_lab9 = "../course-pack/labs/lab9/lab9_metrics.json"
+    
+    with open(filename_backend, "w") as f:
         json.dump(report_data, f, indent=2)
+    
+    try:
+        with open(filename_lab9, "w") as f:
+            json.dump(report_data, f, indent=2)
+    except Exception as e:
+        print(f"Warning: Could not save to lab9 folder: {e}")
+    
+    filename = filename_backend
 
+    # Calculate cost statistics
+    total_cost = sum(r["cost"] for r in results)
+    avg_cost = total_cost / len(results) if results else 0
+    total_input_tokens = sum(r["input_tokens"] for r in results)
+    total_output_tokens = sum(r["output_tokens"] for r in results)
+    
+    # Calculate latency percentiles
+    latencies = sorted([r["latency"] for r in results])
+    p50 = latencies[len(latencies) // 2] if latencies else 0
+    p95 = latencies[int(len(latencies) * 0.95)] if latencies else 0
+    p99 = latencies[int(len(latencies) * 0.99)] if latencies else 0
+    
     print(f"\n{'='*60}")
     print("SUMMARY")
     print(f"{'='*60}")
-    print(f"Success Rate:     {successful/len(results)*100:.1f}%")
+    print(f"Success Rate:     {successful/len(results)*100:.1f}% ({successful}/{len(results)})")
     print(f"Avg Latency:      {avg_latency:.2f}s")
+    print(f"Latency P50:      {p50:.2f}s")
+    print(f"Latency P95:      {p95:.2f}s")
+    print(f"Latency P99:      {p99:.2f}s")
     print(f"Total Time:       {total_latency:.1f}s")
-    print(f"\n📄 Metrics saved to: {filename}") # Confirm file save
+    print(f"\nToken Usage:")
+    print(f"  Total Input:     {total_input_tokens:,} tokens")
+    print(f"  Total Output:    {total_output_tokens:,} tokens")
+    print(f"  Avg Input:       {total_input_tokens/len(results):.0f} tokens/query")
+    print(f"  Avg Output:      {total_output_tokens/len(results):.0f} tokens/query")
+    print(f"\nCost Analysis:")
+    print(f"  Total Cost:      ${total_cost:.4f}")
+    print(f"  Avg Cost/Query:  ${avg_cost:.6f}")
+    print(f"\n📄 Metrics saved to: {filename}")
     print(f"{'='*60}")
     
     failures = [r for r in results if not r["success"]]
     if failures:
-        print(f"\nFailed Queries:")
+        print(f"\n{'='*60}")
+        print(f"FAILED QUERIES ({len(failures)}/{len(results)})")
+        print(f"{'='*60}")
+        
+        # Group failures by error type
+        error_groups = {}
         for f in failures:
-            print(f"  [{f['index']}] {f['scenario']}: {f['error']}")
+            error_key = f['error'] if f['error'] else "Unknown error"
+            if error_key not in error_groups:
+                error_groups[error_key] = []
+            error_groups[error_key].append(f)
+        
+        # Print grouped errors
+        for error_msg, error_list in error_groups.items():
+            print(f"\n❌ Error: {error_msg}")
+            print(f"   Count: {len(error_list)}")
+            print(f"   Affected queries:")
+            for f in error_list[:5]:  # Show first 5 examples
+                print(f"     - [{f['index']:02d}] {f['scenario']}")
+            if len(error_list) > 5:
+                print(f"     ... and {len(error_list) - 5} more")
+        
+        # Print summary by career
+        print(f"\n{'='*60}")
+        print("FAILURE BREAKDOWN BY CAREER")
+        print(f"{'='*60}")
+        career_failures = {}
+        for f in failures:
+            career = f['scenario'].split(' - ')[0]
+            if career not in career_failures:
+                career_failures[career] = 0
+            career_failures[career] += 1
+        
+        for career, count in sorted(career_failures.items()):
+            total_for_career = sum(1 for r in results if r['scenario'].startswith(career))
+            print(f"  {career:<25} {count}/{total_for_career} failed ({count/total_for_career*100:.0f}%)")
 
 if __name__ == "__main__":
     print(f"Targeting Backend at: {BASE_URL}")

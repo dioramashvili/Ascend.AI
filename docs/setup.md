@@ -1,4 +1,4 @@
-# 🧠 Project Setup Guide – Ascend.AI / CareerSim
+ # 🧠 Project Setup Guide – Ascend.AI / CareerSim
 
 This document describes the basic setup instructions for contributors working on the **CareerSim – AI Career Experience Simulator** project.
 
