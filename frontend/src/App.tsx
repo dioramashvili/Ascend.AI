@@ -103,20 +103,23 @@ function App() {
   };
 
   return (
-    <div className="app-root" >
+    <div className="app-root">
       <h1>Ascend.AI Career Simulator</h1>
       
-      
-      <div className="control-panel" >
+      <div className="control-panel">
         <input
           type="text"
           value={careerTitle}
           onChange={(e) => setCareerTitle(e.target.value)}
-          placeholder="e.g. Python Developer"
-          style={{ padding: '8px', flex: 1 }}
+          placeholder="Enter career title (e.g., Python Developer, Data Scientist)"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !isLoading && careerTitle) {
+              handleGenerateScenario();
+            }
+          }}
         />
         
-        <label className="checkbox" >
+        <label className="checkbox">
           <input 
             type="checkbox" 
             checked={isCodingSimulation} 
@@ -127,49 +130,51 @@ function App() {
 
         <button 
           onClick={handleGenerateScenario} 
-          disabled={isLoading || !careerTitle}
-          className='generate-button'
+          disabled={isLoading || !careerTitle.trim()}
+          className="generate-button"
         >
-         {isLoading ? 'Generating...' : 'Start'}
+          {isLoading ? 'Generating...' : 'Generate Scenario'}
         </button>
       </div>
 
-      {error && <div className="error-message" >Error: {error}</div>}
+      {error && <div className="error-message">⚠️ {error}</div>}
 
       {scenario && (
-        <div className="scenario-container" >
+        <div className="scenario-container">
           <span className="scenario-title">{scenario.career_title}</span>
           <h2>Scenario Challenge</h2>
-          <p style={{ lineHeight: '1.6' }}>{scenario.scenario_text}</p>
+          <p>{scenario.scenario_text}</p>
           
           {isCodingSimulation ? (
-            <div >
+            <div>
               <h3>Fix the Code:</h3>
               <textarea 
                 value={userCode}
                 onChange={(e) => setUserCode(e.target.value)}
-                className='text-area'
+                className="text-area"
+                placeholder="Write your solution here..."
               />
-              <br />
               <button 
                 onClick={() => handleEvaluate(userCode)}
-                disabled={isLoading}
-                className='evaluate-button'
+                disabled={isLoading || !userCode.trim()}
+                className="evaluate-button"
               >
-                Submit Solution
+                {isLoading ? 'Evaluating...' : 'Submit Solution'}
               </button>
             </div>
           ) : (
-            <div className='options-div'>
+            <div className="options-div">
               <h3>Choose the best action:</h3>
-              <div className='options-list'>
+              <div className="options-list">
                 {scenario.options.map((option, index) => (
                   <button
                     key={index}
                     onClick={() => handleEvaluate(String.fromCharCode(65 + index))} 
                     disabled={isLoading}
-                    
                   >
+                    <span style={{ fontWeight: 600, marginRight: '8px' }}>
+                      {String.fromCharCode(65 + index)}.
+                    </span>
                     {option}
                   </button>
                 ))}
@@ -180,15 +185,15 @@ function App() {
       )}
 
       {evaluation && (
-         <div className="evaluation-div">
-           <h2 >Evaluation Result</h2>
-           <div className="score">
-             Score: {evaluation.score} / 10
-           </div>
-           <p><strong>Feedback:</strong> {evaluation.feedback}</p>
-           <hr />
-           <p >{evaluation.explanation}</p>
-         </div>
+        <div className="evaluation-div">
+          <h2>Evaluation Result</h2>
+          <div className="score">
+            {evaluation.score} / 10
+          </div>
+          <p><strong>Feedback:</strong> {evaluation.feedback}</p>
+          <hr />
+          <p>{evaluation.explanation}</p>
+        </div>
       )}
     </div>
   );
