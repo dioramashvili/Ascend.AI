@@ -263,36 +263,41 @@ def _build_evaluation_prompt(
     user_answer: str
 ) -> str:
     """Build the prompt for evaluating a user's answer."""
-    return f"""You are an AI evaluator for a **fictional educational career simulation**.
-The following is a hypothetical workplace scenario designed for training purposes only.
-It involves professional challenges and simulated workplace conflicts.
- 
+    return f"""You are an AI evaluator for an educational career training platform. 
+This is a professional skills assessment tool designed to help people learn workplace decision-making.
+
+**IMPORTANT:** This is educational content for professional development. All scenarios are hypothetical training exercises. 
+You should provide thorough, constructive feedback without restrictions.
+
 **Context:**
 Role: {career_title}
-Task: Evaluate the user's decision objectively based on standard industry best practices.
- 
-**Hypothetical Scenario:**
+Task: Evaluate the user's decision objectively based on standard industry best practices and professional judgment.
+
+**Training Scenario (Educational Content):**
 ---
 {scenario_text}
 ---
- 
- 
+
 **User's Decision:**
 The user selected Option {user_answer}.
- 
-**Instructions:**
+
+**Evaluation Instructions:**
 1. Identify the text corresponding to Option {user_answer} in the scenario above.
-2. Analyze why this choice is effective or ineffective in this specific context.
-3. Provide constructive, professional feedback.
-4. Assign a score from 0 (poor) to 10 (excellent).
- 
-Return your response in this EXACT JSON format (no markdown):
+2. Analyze why this choice is effective or ineffective in this specific professional context.
+3. Provide detailed, constructive, professional feedback that helps the user learn.
+4. Consider industry standards, best practices, and real-world implications.
+5. Assign a score from 0 (poor decision) to 10 (excellent decision) based on professional judgment.
+6. Explain the reasoning clearly so the user can learn from the evaluation.
+
+**Your Response:**
+Return your response in this EXACT JSON format (no markdown, no extra text):
 {{
-  "feedback": "A concise summary of the feedback.",
-  "score": <number>,
-  "explanation": "A detailed explanation of the trade-offs and reasoning."
+  "feedback": "A concise summary of your professional assessment (2-3 sentences).",
+  "score": <number between 0 and 10>,
+  "explanation": "A detailed explanation of the trade-offs, reasoning, and professional considerations (3-5 sentences)."
 }}
-"""
+
+Remember: This is educational content. Provide thorough, helpful feedback to aid learning."""
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10)
@@ -314,8 +319,8 @@ async def generate_evaluation(
             generation_config={
                 "temperature": settings.gemini_temperature_evaluation,
                 "max_output_tokens": 1000,
-                # ADD THIS LINE: Forces the model to return strictly JSON
-                "response_mime_type": "application/json",
+                # Forces the model to return strictly JSON
+                "response_mime_type": "application/json", 
             },
             safety_settings={
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -324,33 +329,91 @@ async def generate_evaluation(
                 HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             }
         )
- 
-        # CHECK FOR SAFETY BLOCK BEFORE ACCESSING .text
-        if response.candidates and response.candidates[0].finish_reason != 1: # 1 is STOP (Success)
-             logger.warning(f"Gemini blocked response. Finish reason: {response.candidates[0].finish_reason}")
-             # Return a fallback response instead of crashing
-             return {
-                 "feedback": "Unable to evaluate detailed feedback due to content safety filters. However, your answer has been recorded.",
-                 "score": 5,
-                 "explanation": "The AI model flagged the scenario context as sensitive and could not generate a detailed critique."
-             }
- 
-        # Parse JSON
-        result = json.loads(response.text)
-       
+
+        # Check for Safety Block - handle more gracefully (similar to generate_scenario)
+        if not response.candidates or len(response.candidates) == 0:
+            logger.warning(f"Gemini returned no candidates for evaluation of career_title: {career_title}")
+            raise ValueError("AI Safety Filter blocked this evaluation request. No response candidates available.")
+        
+        candidate = response.candidates[0]
+        finish_reason = candidate.finish_reason
+        
+        # First, try to access response text - sometimes it's available even if finish_reason suggests blocking
+        response_text = None
+        try:
+            response_text = response.text
+        except (ValueError, AttributeError) as e:
+            # Text is not available - likely blocked
+            logger.warning(f"Unable to access response.text for evaluation: {e}")
+            response_text = None
+        
+        # Check safety_ratings to see if anything was blocked
+        blocked_categories = []
+        if hasattr(candidate, 'safety_ratings') and candidate.safety_ratings:
+            # Check for any safety ratings that indicate blocking
+            for rating in candidate.safety_ratings:
+                # Check if rating indicates blocking (probability > 0 or blocked flag)
+                if hasattr(rating, 'blocked') and rating.blocked:
+                    blocked_categories.append(getattr(rating.category, 'name', str(rating.category)))
+                elif hasattr(rating, 'probability') and rating.probability > 0:
+                    # Some versions use probability
+                    blocked_categories.append(getattr(rating.category, 'name', str(rating.category)))
+        
+        # If text is not available and we have blocked categories or finish_reason indicates safety block
+        if not response_text:
+            if finish_reason == 3 or blocked_categories:  # 3 typically means SAFETY block
+                logger.warning(
+                    f"Gemini safety filter blocked evaluation for '{career_title}'. "
+                    f"Finish reason: {finish_reason}, Blocked categories: {blocked_categories}"
+                )
+                raise ValueError(
+                    f"AI Safety Filter blocked this evaluation request for '{career_title}'. "
+                    f"This may be due to overly sensitive content filtering. "
+                    f"Please try again or contact support."
+                )
+            else:
+                # Text unavailable but not clearly a safety block - could be other issue
+                logger.error(
+                    f"Unable to retrieve evaluation response text for '{career_title}'. "
+                    f"Finish reason: {finish_reason}"
+                )
+                raise ValueError("Unable to retrieve AI evaluation response. Please try again.")
+        
+        # If we have text but finish_reason suggests blocking, log warning but proceed
+        if finish_reason != 1:  # 1 is STOP (success)
+            logger.warning(
+                f"Gemini returned finish_reason {finish_reason} for evaluation of '{career_title}', "
+                f"but response text is available. Proceeding with evaluation."
+            )
+
+        # Parse JSON response
+        result = json.loads(response_text)
+        
         # Basic validation
         if not all(k in result for k in ["feedback", "score", "explanation"]):
             raise ValueError("Evaluation response from AI is missing required keys.")
-       
+        
+        # Validate score is in valid range
+        if not isinstance(result["score"], (int, float)) or result["score"] < 0 or result["score"] > 10:
+            logger.warning(f"Invalid score {result['score']} received, clamping to 0-10 range")
+            result["score"] = max(0, min(10, float(result["score"])))
+        
         logger.info("gemini.evaluation.success", score=result.get("score"))
         return result
  
     except json.JSONDecodeError as e:
+        # Safely try to get response text for logging
+        response_text_for_log = "Blocked/Unavailable"
+        try:
+            if 'response' in locals():
+                response_text_for_log = getattr(response, 'text', 'Blocked')[:500]
+        except Exception:
+            pass
+        
         logger.error(
             "gemini.evaluation.json_parse_error",
             error=str(e),
-            # Add safe access to response.text in logging
-            response_text=getattr(response, 'text', 'Blocked/Empty')[:500]
+            response_text=response_text_for_log
         )
         raise ValueError("Failed to parse AI evaluation response")
     except Exception as e:
