@@ -206,6 +206,26 @@ html, body {
     color: #cccccc;
     font-size: 0.875rem;
     margin-bottom: 16px;
+    white-space: pre-wrap;
+}
+
+.cursor-blink {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background-color: #cccccc;
+    margin-left: 2px;
+    animation: blink 1s infinite;
+    vertical-align: baseline;
+}
+
+@keyframes blink {
+    0%, 49% {
+        opacity: 1;
+    }
+    50%, 100% {
+        opacity: 0;
+    }
 }
 
 .scenario-title {

@@ -25,17 +25,23 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   
   const [isCodingSimulation, setIsCodingSimulation] = useState(false);
-  const [userCode, setUserCode] = useState(''); 
+  const [userCode, setUserCode] = useState('');
+  
+  // Streaming state
+  const [streamingText, setStreamingText] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false); 
 
   const handleGenerateScenario = async () => {
     setIsLoading(true);
+    setIsStreaming(true);
     setError(null);
     setScenario(null);
     setEvaluation(null);
-    setUserCode(''); 
+    setUserCode('');
+    setStreamingText('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/scenarios/generate`, {
+      const response = await fetch(`${API_BASE_URL}/scenarios/generate-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -48,14 +54,55 @@ function App() {
         throw new Error(`Failed to generate scenario: ${response.statusText}`);
       }
 
-      const data: Scenario = await response.json();
-      setScenario(data);
-      
-      if (data.initial_code) {
-        setUserCode(data.initial_code);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let buffer = '';
+      let fullScenario: Scenario | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+
+              if (data.type === 'word') {
+                // Update streaming text word by word
+                setStreamingText(data.text);
+              } else if (data.type === 'complete') {
+                // Scenario generation complete
+                fullScenario = data.scenario;
+                setScenario(fullScenario);
+                setIsStreaming(false);
+
+                if (fullScenario && fullScenario.initial_code) {
+                  setUserCode(fullScenario.initial_code);
+                }
+              } else if (data.type === 'error') {
+                throw new Error(data.message || 'Unknown error');
+              }
+            } catch (parseError) {
+              console.error('Error parsing SSE data:', parseError);
+            }
+          }
+        }
       }
     } catch (err: any) {
       setError(err.message);
+      setIsStreaming(false);
+      setStreamingText('');
     } finally {
       setIsLoading(false);
     }
@@ -139,47 +186,57 @@ function App() {
 
       {error && <div className="error-message">⚠️ {error}</div>}
 
-      {scenario && (
+      {(scenario || isStreaming) && (
         <div className="scenario-container">
-          <span className="scenario-title">{scenario.career_title}</span>
+          <span className="scenario-title">
+            {scenario?.career_title || careerTitle}
+          </span>
           <h2>Scenario Challenge</h2>
-          <p>{scenario.scenario_text}</p>
+          <p>
+            {isStreaming ? streamingText : (scenario?.scenario_text || '')}
+            {isStreaming && <span className="cursor-blink">|</span>}
+          </p>
           
-          {isCodingSimulation ? (
-            <div>
-              <h3>Fix the Code:</h3>
-              <textarea 
-                value={userCode}
-                onChange={(e) => setUserCode(e.target.value)}
-                className="text-area"
-                placeholder="Write your solution here..."
-              />
-              <button 
-                onClick={() => handleEvaluate(userCode)}
-                disabled={isLoading || !userCode.trim()}
-                className="evaluate-button"
-              >
-                {isLoading ? 'Evaluating...' : 'Submit Solution'}
-              </button>
-            </div>
-          ) : (
-            <div className="options-div">
-              <h3>Choose the best action:</h3>
-              <div className="options-list">
-                {scenario.options.map((option, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleEvaluate(String.fromCharCode(65 + index))} 
-                    disabled={isLoading}
+          {/* Only show options/code editor after streaming is complete */}
+          {!isStreaming && scenario && (
+            <>
+              {isCodingSimulation ? (
+                <div>
+                  <h3>Fix the Code:</h3>
+                  <textarea 
+                    value={userCode}
+                    onChange={(e) => setUserCode(e.target.value)}
+                    className="text-area"
+                    placeholder="Write your solution here..."
+                  />
+                  <button 
+                    onClick={() => handleEvaluate(userCode)}
+                    disabled={isLoading || !userCode.trim()}
+                    className="evaluate-button"
                   >
-                    <span style={{ fontWeight: 600, marginRight: '8px' }}>
-                      {String.fromCharCode(65 + index)}.
-                    </span>
-                    {option}
+                    {isLoading ? 'Evaluating...' : 'Submit Solution'}
                   </button>
-                ))}
-              </div>
-            </div>
+                </div>
+              ) : (
+                <div className="options-div">
+                  <h3>Choose the best action:</h3>
+                  <div className="options-list">
+                    {scenario.options.map((option, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleEvaluate(String.fromCharCode(65 + index))} 
+                        disabled={isLoading}
+                      >
+                        <span style={{ fontWeight: 600, marginRight: '8px' }}>
+                          {String.fromCharCode(65 + index)}.
+                        </span>
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
