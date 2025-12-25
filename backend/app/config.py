@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     gemini_temperature_evaluation: float = 0.3
     gemini_max_tokens: int = 2000
     
+    # DeepSeek AI (Fallback Provider)
+    deepseek_api_key: Optional[str] = None
+    deepseek_model: str = "deepseek-chat"
+    
     # Redis
     redis_host: str = "redis"
     redis_port: int = 6379

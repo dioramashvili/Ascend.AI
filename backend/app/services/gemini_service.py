@@ -1,4 +1,5 @@
 import json
+import asyncio
 from typing import Dict, Any
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -6,6 +7,7 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
  
 from app.config import get_settings
 from app.core.logging import get_logger
+from app.providers import get_llm_router
  
 settings = get_settings()
 logger = get_logger(__name__)
@@ -23,7 +25,7 @@ async def generate_scenario(
     is_coding: bool = False
 ) -> Dict[str, Any]:
     """
-    Generate a career scenario using Gemini Flash.
+    Generate a career scenario using multi-vendor fallback (Gemini -> DeepSeek).
     """
    
     # 1. Choose the prompt
@@ -33,84 +35,30 @@ async def generate_scenario(
         prompt = _build_scenario_prompt(career_title, difficulty, focus_area)
    
     try:
-        model = genai.GenerativeModel(settings.gemini_model_flash)
-       
-        response = await model.generate_content_async(
-            prompt,
-            generation_config={
-                "temperature": settings.gemini_temperature_generation,
-                "max_output_tokens": settings.gemini_max_tokens,
-                # IMPORTANT: Keep this to ensure the code snippet doesn't break JSON
-                "response_mime_type": "application/json",
-            },
-            safety_settings={
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-            }
+        # Use router with fallback chain (Gemini -> DeepSeek)
+        router = get_llm_router(max_retries=3)
+        
+        # Run router in thread pool since it's synchronous
+        loop = asyncio.get_event_loop()
+        provider_response = await loop.run_in_executor(
+            None,
+            lambda: router.generate(prompt, max_tokens=settings.gemini_max_tokens, response_format="json")
         )
         
-        # Check for Safety Block - handle more gracefully
-        if not response.candidates or len(response.candidates) == 0:
-            logger.warning(f"Gemini returned no candidates for career_title: {career_title}")
-            raise ValueError("AI Safety Filter blocked this request. No response candidates available.")
+        logger.info(
+            "llm.scenario.success",
+            model=provider_response.model,
+            career_title=career_title,
+            difficulty=difficulty,
+            is_coding=is_coding,
+            cost=provider_response.cost,
+            latency_ms=provider_response.latency_ms
+        )
         
-        candidate = response.candidates[0]
-        finish_reason = candidate.finish_reason
-        
-        # First, try to access response text - sometimes it's available even if finish_reason suggests blocking
-        response_text = None
-        try:
-            response_text = response.text
-        except (ValueError, AttributeError) as e:
-            # Text is not available - likely blocked
-            logger.warning(f"Unable to access response.text: {e}")
-            response_text = None
-        
-        # Check safety_ratings to see if anything was blocked
-        blocked_categories = []
-        if hasattr(candidate, 'safety_ratings') and candidate.safety_ratings:
-            # Check for any safety ratings that indicate blocking
-            for rating in candidate.safety_ratings:
-                # Check if rating indicates blocking (probability > 0 or blocked flag)
-                if hasattr(rating, 'blocked') and rating.blocked:
-                    blocked_categories.append(getattr(rating.category, 'name', str(rating.category)))
-                elif hasattr(rating, 'probability') and rating.probability > 0:
-                    # Some versions use probability
-                    blocked_categories.append(getattr(rating.category, 'name', str(rating.category)))
-        
-        # If text is not available and we have blocked categories or finish_reason indicates safety block
-        if not response_text:
-            if finish_reason == 3 or blocked_categories:  # 3 typically means SAFETY block
-                logger.warning(
-                    f"Gemini safety filter blocked request for '{career_title}'. "
-                    f"Finish reason: {finish_reason}, Blocked categories: {blocked_categories}"
-                )
-                raise ValueError(
-                    f"AI Safety Filter blocked this request for '{career_title}'. "
-                    f"This may be due to overly sensitive content filtering. "
-                    f"Please try a different career title or contact support."
-                )
-            else:
-                # Text unavailable but not clearly a safety block - could be other issue
-                logger.error(
-                    f"Unable to retrieve response text for '{career_title}'. "
-                    f"Finish reason: {finish_reason}"
-                )
-                raise ValueError("Unable to retrieve AI response. Please try again.")
-        
-        # If we have text but finish_reason suggests blocking, log warning but proceed
-        if finish_reason != 1:  # 1 is STOP (success)
-            logger.warning(
-                f"Gemini returned finish_reason {finish_reason} for '{career_title}', "
-                f"but response text is available. Proceeding with caution."
-            )
-
         # Parse JSON response
-        result = json.loads(response_text)
+        result = json.loads(provider_response.content)
         
-        # --- NEW VALIDATION LOGIC ---
+        # --- VALIDATION LOGIC ---
         if is_coding:
             # For coding, we just check if 'initial_code' exists.
             # We SKIP the strict "3 options" check.
@@ -119,41 +67,28 @@ async def generate_scenario(
         else:
             # For normal scenarios, we run the strict validation (must have 3 options)
             _validate_scenario_response(result)
-        # ----------------------------
-        if response.usage_metadata:
-            result['input_tokens'] = response.usage_metadata.prompt_token_count
-            result['output_tokens'] = response.usage_metadata.candidates_token_count
-        else:
-            result['input_tokens'] = 0
-            result['output_tokens'] = 0
- 
-        logger.info(
-            "gemini.scenario.success",
-            career_title=career_title,
-            difficulty=difficulty,
-            is_coding=is_coding
-        )
+        
+        # Add token usage info
+        result['input_tokens'] = provider_response.tokens_used  # Approximate
+        result['output_tokens'] = 0  # Router doesn't separate these
        
         return result
        
     except json.JSONDecodeError as e:
-        # Safely try to get response text for logging
-        response_text_for_log = "Blocked/Unavailable"
-        try:
-            if 'response' in locals():
-                response_text_for_log = getattr(response, 'text', 'Blocked')[:500]
-        except Exception:
-            pass
-        
         logger.error(
-            "gemini.json_parse_error",
+            "llm.json_parse_error",
             error=str(e),
-            response_text=response_text_for_log
+            career_title=career_title
         )
         raise ValueError("Failed to parse AI response")
        
     except Exception as e:
-        logger.error("gemini.api_error", error=str(e))
+        logger.error(
+            "llm.api_error",
+            error=str(e),
+            error_type=type(e).__name__,
+            career_title=career_title
+        )
         raise
 def _build_coding_scenario_prompt(career_title: str, difficulty: str) -> str:
     return f"""You are an educational content creator developing a coding exercise for a career training application.
@@ -308,86 +243,31 @@ async def generate_evaluation(
     user_answer: str
 ) -> Dict[str, Any]:
     """
-    Evaluates a user's answer using Gemini and returns feedback and a score.
+    Evaluates a user's answer using multi-vendor fallback (Gemini -> DeepSeek) and returns feedback and a score.
     """
     prompt = _build_evaluation_prompt(career_title, scenario_text, user_answer)
+    
     try:
-        model = genai.GenerativeModel(settings.gemini_model_flash)
-       
-        response = await model.generate_content_async(
-            prompt,
-            generation_config={
-                "temperature": settings.gemini_temperature_evaluation,
-                "max_output_tokens": 1000,
-                # Forces the model to return strictly JSON
-                "response_mime_type": "application/json", 
-            },
-            safety_settings={
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-            }
+        # Use router with fallback chain (Gemini -> DeepSeek) and evaluation temperature
+        router = get_llm_router(max_retries=3, temperature=settings.gemini_temperature_evaluation)
+        
+        # Run router in thread pool since it's synchronous
+        loop = asyncio.get_event_loop()
+        provider_response = await loop.run_in_executor(
+            None,
+            lambda: router.generate(prompt, max_tokens=1000, response_format="json")
+        )
+        
+        logger.info(
+            "llm.evaluation.success",
+            model=provider_response.model,
+            career_title=career_title,
+            cost=provider_response.cost,
+            latency_ms=provider_response.latency_ms
         )
 
-        # Check for Safety Block - handle more gracefully (similar to generate_scenario)
-        if not response.candidates or len(response.candidates) == 0:
-            logger.warning(f"Gemini returned no candidates for evaluation of career_title: {career_title}")
-            raise ValueError("AI Safety Filter blocked this evaluation request. No response candidates available.")
-        
-        candidate = response.candidates[0]
-        finish_reason = candidate.finish_reason
-        
-        # First, try to access response text - sometimes it's available even if finish_reason suggests blocking
-        response_text = None
-        try:
-            response_text = response.text
-        except (ValueError, AttributeError) as e:
-            # Text is not available - likely blocked
-            logger.warning(f"Unable to access response.text for evaluation: {e}")
-            response_text = None
-        
-        # Check safety_ratings to see if anything was blocked
-        blocked_categories = []
-        if hasattr(candidate, 'safety_ratings') and candidate.safety_ratings:
-            # Check for any safety ratings that indicate blocking
-            for rating in candidate.safety_ratings:
-                # Check if rating indicates blocking (probability > 0 or blocked flag)
-                if hasattr(rating, 'blocked') and rating.blocked:
-                    blocked_categories.append(getattr(rating.category, 'name', str(rating.category)))
-                elif hasattr(rating, 'probability') and rating.probability > 0:
-                    # Some versions use probability
-                    blocked_categories.append(getattr(rating.category, 'name', str(rating.category)))
-        
-        # If text is not available and we have blocked categories or finish_reason indicates safety block
-        if not response_text:
-            if finish_reason == 3 or blocked_categories:  # 3 typically means SAFETY block
-                logger.warning(
-                    f"Gemini safety filter blocked evaluation for '{career_title}'. "
-                    f"Finish reason: {finish_reason}, Blocked categories: {blocked_categories}"
-                )
-                raise ValueError(
-                    f"AI Safety Filter blocked this evaluation request for '{career_title}'. "
-                    f"This may be due to overly sensitive content filtering. "
-                    f"Please try again or contact support."
-                )
-            else:
-                # Text unavailable but not clearly a safety block - could be other issue
-                logger.error(
-                    f"Unable to retrieve evaluation response text for '{career_title}'. "
-                    f"Finish reason: {finish_reason}"
-                )
-                raise ValueError("Unable to retrieve AI evaluation response. Please try again.")
-        
-        # If we have text but finish_reason suggests blocking, log warning but proceed
-        if finish_reason != 1:  # 1 is STOP (success)
-            logger.warning(
-                f"Gemini returned finish_reason {finish_reason} for evaluation of '{career_title}', "
-                f"but response text is available. Proceeding with evaluation."
-            )
-
         # Parse JSON response
-        result = json.loads(response_text)
+        result = json.loads(provider_response.content)
         
         # Basic validation
         if not all(k in result for k in ["feedback", "score", "explanation"]):
@@ -398,24 +278,20 @@ async def generate_evaluation(
             logger.warning(f"Invalid score {result['score']} received, clamping to 0-10 range")
             result["score"] = max(0, min(10, float(result["score"])))
         
-        logger.info("gemini.evaluation.success", score=result.get("score"))
         return result
  
     except json.JSONDecodeError as e:
-        # Safely try to get response text for logging
-        response_text_for_log = "Blocked/Unavailable"
-        try:
-            if 'response' in locals():
-                response_text_for_log = getattr(response, 'text', 'Blocked')[:500]
-        except Exception:
-            pass
-        
         logger.error(
-            "gemini.evaluation.json_parse_error",
+            "llm.evaluation.json_parse_error",
             error=str(e),
-            response_text=response_text_for_log
+            career_title=career_title
         )
         raise ValueError("Failed to parse AI evaluation response")
     except Exception as e:
-        logger.error("gemini.evaluation.api_error", error=str(e))
+        logger.error(
+            "llm.evaluation.api_error",
+            error=str(e),
+            error_type=type(e).__name__,
+            career_title=career_title
+        )
         raise
