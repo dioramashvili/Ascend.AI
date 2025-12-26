@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # Can be set via CORS_ORIGINS env var as comma-separated string
     # Default includes localhost for development
     # For production, set CORS_ORIGINS env var with your frontend URL(s)
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000", "https://ascend-ai-4pyg.onrender.com"]
+    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000", "https://ascend-ai-1-u6ml.onrender.com"]
     
     # Cache TTL (in seconds)
     cache_ttl_scenario: int = 3600  # 1 hour
