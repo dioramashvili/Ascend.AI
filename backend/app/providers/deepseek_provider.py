@@ -1,6 +1,6 @@
 """DeepSeek LLM provider implementation."""
 import time
-from openai import OpenAI
+# from openai import OpenAI
 from typing import Optional
 
 from .base_provider import LLMProvider, ProviderResponse, ProviderError

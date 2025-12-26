@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
 
 
 class Settings(BaseSettings):
@@ -46,6 +47,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     
     # CORS
+    # Can be set via CORS_ORIGINS env var as comma-separated string
+    # Default includes localhost for development
+    # For production, set CORS_ORIGINS env var with your frontend URL(s)
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     
     # Cache TTL (in seconds)
@@ -68,4 +72,12 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings()
+    settings = Settings()
+    
+    # Parse CORS_ORIGINS from environment variable if set
+    # Format: comma-separated string, e.g., "http://localhost:5173,https://example.com"
+    cors_origins_env = os.getenv("CORS_ORIGINS")
+    if cors_origins_env:
+        settings.cors_origins = [origin.strip() for origin in cors_origins_env.split(",")]
+    
+    return settings
