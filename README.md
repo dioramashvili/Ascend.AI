@@ -9,10 +9,9 @@ An AI-powered trip planner that enhances travel routes by suggesting nearby poin
 
 ## About
 
-Ascend.AI helps travelers make the most of their journeys by intelligently expanding their planned routes.  
-Users can input a trip (e.g., from Berlin to Paris) and specify how far off-route they’re willing to explore.  
-The system then recommends interesting nearby attractions — like landmarks,historical sites, art galleries, or restaurants — using AI to personalize suggestions based on user interests.  
-The web app is built with React and FastAPI, using Supabase for authentication and data management.
+CareerSim is an AI-powered career simulation platform that helps users practice real-world professional scenarios through interactive role-based exercises. The system generates dynamic career situations, evaluates user responses, provides structured feedback, and tracks progress across simulation sessions. It supports scenario generation, response assessment, event logging, and persistent session storage to create a realistic and personalized learning experience.
+
+
 
 ## Status
 
